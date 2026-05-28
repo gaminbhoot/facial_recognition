@@ -63,3 +63,4 @@ python src/pipeline/realtime_recognition.py
 - **Biometric Data:** This system processes facial biometric data. Ensure you have consent before enrolling users.
 - **Vector Storage:** The system stores embeddings (mathematical vectors), not raw images, by default in the database for better security.
 - **Privacy Mode:** Enable Privacy Mode (`v`) when using the system in public spaces to protect the identity of non-enrolled individuals.
+# facial_recognition
