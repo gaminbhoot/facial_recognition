@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <title>VisionOS - Face Biometric Center</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="glass-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon"></div>
+                <h1>VisionOS</h1>
+            </div>
+            <nav id="sidebar-nav">
+                <div class="nav-item active" data-tab="live-feed-tab">
+                    <span class="icon">📹</span> Live Stream
+                </div>
+                <div class="nav-item" data-tab="database-tab">
+                    <span class="icon">👥</span> Database
+                </div>
+                <div class="nav-item" data-tab="settings-tab">
+                    <span class="icon">⚙️</span> Settings
+                </div>
+            </nav>
+            <div class="stats-card">
+                <h3>System Health</h3>
+                <div class="stat">
+                    <span>FPS</span>
+                    <span id="fps-value">0.0</span>
+                </div>
+                <div class="stat">
+                    <span>Privacy</span>
+                    <span id="privacy-status">OFF</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content">
+            <!-- 1. LIVE STREAM TAB -->
+            <div id="live-feed-tab" class="tab-content active">
+                <header>
+                    <div class="header-info">
+                        <h2>Live Recognition Feed</h2>
+                        <p>Real-time identity verification and tracking</p>
+                    </div>
+                </header>
+                <div class="main-grid">
+                    <section class="feed-section">
+                        <div class="video-wrapper">
+                            <img id="video-feed" src="/video_feed" alt="Video Stream">
+                            <div class="overlay-badge">LIVE</div>
+                        </div>
+                    </section>
+                    <section class="logs-section">
+                        <div class="section-header">
+                            <h3>Detection Logs</h3>
+                            <span id="log-count">0 Detected</span>
+                        </div>
+                        <div id="logs-container" class="logs-list">
+                            <div class="log-placeholder">System monitoring...</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- 2. DATABASE TAB -->
+            <div id="database-tab" class="tab-content">
+                <header>
+                    <div class="header-info">
+                        <h2>Biometric Database</h2>
+                        <p>Manage enrolled users and register new identities</p>
+                    </div>
+                </header>
+                <div class="database-grid">
+                    <!-- Enrollment Card -->
+                    <section class="card enrollment-card">
+                        <h3>Enroll New Identity</h3>
+                        <p class="subtitle">Ensures a single live face is visible in camera</p>
+                        <form id="enrollment-form">
+                            <div class="form-group">
+                                <label for="enroll-name">User Full Name</label>
+                                <input type="text" id="enroll-name" placeholder="e.g. Alice Smith" required autocomplete="off">
+                            </div>
+                            <button type="submit" id="btn-enroll" class="btn-primary">
+                                <span class="btn-icon">📸</span> Capture & Register
+                            </button>
+                        </form>
+                        <div id="enrollment-alert" class="alert hidden"></div>
+                    </section>
+                    
+                    <!-- Users List -->
+                    <section class="card users-list-card">
+                        <h3>Enrolled Identities</h3>
+                        <div class="table-wrapper">
+                            <table class="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Identity Name</th>
+                                        <th>Embeddings</th>
+                                        <th>Enroll Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr>
+                                        <td colspan="4" class="table-placeholder">Loading users database...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- 3. SETTINGS TAB -->
+            <div id="settings-tab" class="tab-content">
+                <header>
+                    <div class="header-info">
+                        <h2>System Control Center</h2>
+                        <p>Configure algorithms, thresholds, and performance modes</p>
+                    </div>
+                </header>
+                <div class="settings-grid">
+                    <!-- Algorithmic Control -->
+                    <section class="card settings-card">
+                        <h3>Threshold Settings</h3>
+                        
+                        <div class="setting-group">
+                            <div class="setting-header">
+                                <label for="matching-threshold">Matching Confidence Threshold (Cosine Similarity)</label>
+                                <span id="matching-value" class="setting-val">0.60</span>
+                            </div>
+                            <input type="range" id="matching-threshold" min="0.40" max="0.90" step="0.05" value="0.60">
+                            <p class="setting-help">Higher values ensure fewer false positives but require more direct matching views.</p>
+                        </div>
+
+                        <div class="setting-group">
+                            <div class="setting-header">
+                                <label for="liveness-threshold">Liveness Sharpness Threshold (Laplacian Variance)</label>
+                                <span id="liveness-value" class="setting-val">35.0</span>
+                            </div>
+                            <input type="range" id="liveness-threshold" min="10.0" max="100.0" step="5.0" value="35.0">
+                            <p class="setting-help">Controls sensitivity to 2D photo print/screen reflection attacks. Higher means stricter checking.</p>
+                        </div>
+
+                        <button id="save-settings" class="btn-primary">Save Configuration</button>
+                        <div id="settings-alert" class="alert hidden"></div>
+                    </section>
+
+                    <!-- Advanced Telemetry & Privacy -->
+                    <section class="card settings-card">
+                        <h3>System Configuration</h3>
+                        
+                        <div class="toggle-group">
+                            <div class="toggle-info">
+                                <h4>Privacy Obfuscation Mode</h4>
+                                <p>Automatically blurs any "Unknown" faces detected in the stream</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="toggle-privacy-checkbox">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <div class="telemetry-box">
+                            <h4>Real-Time Pipeline Latency</h4>
+                            <div class="metric-row">
+                                <span>Detection (MTCNN):</span>
+                                <span id="lat-det" class="metric-val">-- ms</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Extraction (FaceNet Batch):</span>
+                                <span id="lat-ext" class="metric-val">-- ms</span>
+                            </div>
+                            <div class="metric-row">
+                                <span>Classification (Similarity):</span>
+                                <span id="lat-cls" class="metric-val">-- ms</span>
+                            </div>
+                            <div class="metric-row highlight">
+                                <span>Total Processing Latency:</span>
+                                <span id="lat-tot" class="metric-val">-- ms</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

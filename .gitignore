@@ -1,0 +1,9 @@
+data/secret.key
+data/face_recognition.db
+.venv312/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+data/
+models/*.h5

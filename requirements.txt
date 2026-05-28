@@ -1,0 +1,13 @@
+opencv-python
+tensorflow
+fastapi
+uvicorn
+scikit-learn
+numpy
+matplotlib
+mtcnn
+joblib
+pillow
+pillow-heif
+keras-facenet
+cryptography
