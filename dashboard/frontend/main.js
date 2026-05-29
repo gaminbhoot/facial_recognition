@@ -33,6 +33,7 @@ const enrollmentAlert = document.getElementById('enrollment-alert');
 const usersTableBody = document.getElementById('users-table-body');
 
 let lastSeenNames = new Set();
+let lastLoggedTimes = {};
 let logCount = 0;
 
 // Initialize
@@ -98,12 +99,16 @@ async function updateStatus() {
             const placeholder = document.querySelector('.log-placeholder');
             if (placeholder) placeholder.remove();
 
+            const now = Date.now();
             data.last_seen.forEach(face => {
                 const name = face.name;
-                // Only log new detection sessions to avoid clutter, or log all Unknown/Spoofs
-                if (!lastSeenNames.has(name) || name === 'Unknown' || name === 'Spoof Attack') {
+                const lastLogged = lastLoggedTimes[name] || 0;
+                
+                // Only log new detection sessions to avoid clutter, or log all Unknown/Spoofs with a 5s rate-limit
+                if (!lastSeenNames.has(name) || ((name === 'Unknown' || name === 'Spoof Attack') && now - lastLogged > 5000)) {
                     addLog(name, face.conf);
                     lastSeenNames.add(name);
+                    lastLoggedTimes[name] = now;
                 }
             });
         } else {
@@ -303,11 +308,15 @@ privacyCheckbox.addEventListener('change', async () => {
 
 // Helper for UI alerts
 function showAlert(el, type, message) {
+    if (el.timeoutId) {
+        clearTimeout(el.timeoutId);
+    }
     el.className = `alert ${type}`;
     el.textContent = message;
     
     // Auto fade alert out after 5s
-    setTimeout(() => {
+    el.timeoutId = setTimeout(() => {
         el.className = 'alert hidden';
+        delete el.timeoutId;
     }, 5000);
 }

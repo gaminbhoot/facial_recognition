@@ -240,7 +240,7 @@ header {
 /* Grid Layout */
 .main-grid {
     display: grid;
-    grid-template-columns: 1.8fr 1.2fr;
+    grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
     gap: 28px;
     flex: 1;
     min-height: 0;
@@ -426,7 +426,7 @@ header {
 /* Tab 2: Database Grid layout */
 .database-grid {
     display: grid;
-    grid-template-columns: 1fr 2fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     gap: 28px;
     flex: 1;
     min-height: 0;
@@ -566,7 +566,7 @@ header {
 /* Tab 3: Settings Grid */
 .settings-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 28px;
     flex: 1;
 }

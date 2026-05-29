@@ -60,6 +60,10 @@ async def add_security_headers(request, call_next):
         "img-src 'self' data: blob:; "
         "connect-src 'self'"
     )
+    # Add Cache-Control header for static frontend files to prevent browser caching during updates
+    path = request.url.path
+    if path.endswith((".css", ".js", ".html")) or path == "/":
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
 class RecognitionEngine:
