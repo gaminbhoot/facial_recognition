@@ -3,6 +3,7 @@ import sys
 import os
 import threading
 import time
+import signal
 from collections import deque
 
 # Add project root to sys.path to allow src imports
@@ -369,6 +370,14 @@ def update_settings(req: SettingsRequest):
     engine.threshold = req.recognition_threshold
     engine.liveness_threshold = req.liveness_threshold
     return {"status": "success", "message": "Settings updated successfully."}
+
+@app.post('/shutdown')
+def shutdown_server():
+    def terminate():
+        time.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGINT)
+    threading.Thread(target=terminate, daemon=True).start()
+    return {"status": "success", "message": "Biometric server shutting down..."}
 
 # Mount frontend files
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'dashboard', 'frontend')

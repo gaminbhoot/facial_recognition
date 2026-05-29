@@ -35,6 +35,7 @@ const usersTableBody = document.getElementById('users-table-body');
 let lastSeenNames = new Set();
 let lastLoggedTimes = {};
 let logCount = 0;
+let statusIntervalId = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadUsers();
     
     // Poll status every 500ms
-    setInterval(updateStatus, 500);
+    statusIntervalId = setInterval(updateStatus, 500);
 });
 
 // 1. Tab Switching Setup
@@ -305,6 +306,31 @@ privacyCheckbox.addEventListener('change', async () => {
         console.error('Failed to toggle privacy:', err);
     }
 });
+
+// Shutdown Server Click Handler
+const shutdownBtn = document.getElementById('btn-shutdown');
+if (shutdownBtn) {
+    shutdownBtn.addEventListener('click', async () => {
+        if (confirm("Are you sure you want to shut down the face biometric server? The dashboard will disconnect.")) {
+            try {
+                const response = await fetch(`${API_BASE}/shutdown`, { method: 'POST' });
+                const data = await response.json();
+                alert(data.message);
+                
+                // Disconnect UI and show offline screen
+                clearInterval(statusIntervalId);
+                document.body.innerHTML = `
+                    <div style="height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Inter', sans-serif; background-color: #0b0d11; color: #fff; text-align: center; padding: 20px;">
+                        <h1 style="font-size: 2.5rem; margin-bottom: 12px; color: var(--danger, #ff3b30);">System Offline</h1>
+                        <p style="color: #8a8d93; font-size: 1.1rem; max-width: 500px; line-height: 1.6;">The biometric server has shut down successfully. You can close this browser tab safely.</p>
+                    </div>
+                `;
+            } catch (err) {
+                alert("Failed to send shutdown command. Server might already be offline.");
+            }
+        }
+    });
+}
 
 // Helper for UI alerts
 function showAlert(el, type, message) {
