@@ -5,5 +5,12 @@ venv/
 __pycache__/
 *.pyc
 .DS_Store
-data/
 models/*.h5
+
+# Ignore contents of data subfolders but keep empty directory structures via .gitkeep
+data/raw/*
+data/processed/*
+data/embeddings/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/embeddings/.gitkeep
