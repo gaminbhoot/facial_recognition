@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+import joblib
 from mtcnn import MTCNN
 from src.models.embedding_model import EmbeddingExtractor
 from src.pipeline.preprocess import FacePreprocessor
@@ -31,6 +32,24 @@ class RealTimeRecognizer:
         self.frame_count = 0
         self.last_results = []
         
+        # Load the SVM classifier model
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        model_path = os.path.join(project_root, 'models', 'face_classifier.pkl')
+        encoder_path = os.path.join(project_root, 'models', 'label_encoder.pkl')
+        if os.path.exists(model_path) and os.path.exists(encoder_path):
+            try:
+                self.svm_model = joblib.load(model_path)
+                self.svm_encoder = joblib.load(encoder_path)
+                print("Loaded SVM face classifier and label encoder successfully.")
+            except Exception as e:
+                print(f"Error loading SVM model: {e}")
+                self.svm_model = None
+                self.svm_encoder = None
+        else:
+            self.svm_model = None
+            self.svm_encoder = None
+            print("Warning: SVM classifier files not found. Falling back to Cosine Similarity.")
+            
         print(f"System Initialized. Privacy Mode: {'ON' if self.privacy_mode else 'OFF'}")
 
     def start_stream(self, camera_index=0):
@@ -90,7 +109,10 @@ class RealTimeRecognizer:
                     self.perf.start('classification')
                     for i, embedding in enumerate(embeddings):
                         crop_rgb, x, y, fw, fh = valid_faces_metadata[i]
-                        _, raw_liveness_score = detect_liveness(crop_rgb, threshold=35.0)
+                        # Compute liveness on the raw/original resolution crop (BGR to RGB)
+                        raw_face_pixels = frame[y:y+fh, x:x+fw]
+                        raw_face_rgb = cv2.cvtColor(raw_face_pixels, cv2.COLOR_BGR2RGB)
+                        _, raw_liveness_score = detect_liveness(raw_face_rgb, threshold=35.0)
                         
                         # Smooth liveness score across consecutive frames
                         is_live, smoothed_liveness_score = self.liveness_tracker.get_smoothed_liveness(
@@ -98,7 +120,23 @@ class RealTimeRecognizer:
                         )
                         
                         if is_live:
-                            name, confidence = self.db.match_face(embedding, threshold=self.threshold)
+                            # Use SVM model if available, fallback to Cosine matching
+                            if self.svm_model is not None and self.svm_encoder is not None:
+                                try:
+                                    probs = self.svm_model.predict_proba([embedding])
+                                    max_idx = np.argmax(probs[0])
+                                    svm_conf = float(probs[0][max_idx])
+                                    if svm_conf >= self.threshold:
+                                        name = self.svm_encoder.inverse_transform([max_idx])[0]
+                                        confidence = svm_conf
+                                    else:
+                                        name = "Unknown"
+                                        confidence = svm_conf
+                                except Exception as e:
+                                    print(f"SVM prediction error, falling back: {e}")
+                                    name, confidence = self.db.match_face(embedding, threshold=self.threshold)
+                            else:
+                                name, confidence = self.db.match_face(embedding, threshold=self.threshold)
                         else:
                             name = "Spoof Attack"
                             confidence = smoothed_liveness_score

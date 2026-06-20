@@ -1,21 +1,36 @@
-import numpy as np
+import sys
 import os
+import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 import joblib
 
+# Add project root to sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
 def train_classifier(embeddings_path, model_out_path, encoder_out_path):
     """
     Loads embeddings, trains an SVM classifier, and saves the model.
     """
-    if not os.path.exists(embeddings_path):
-        print(f"Error: Embeddings file not found at {embeddings_path}")
-        return
-
-    # Load the compressed embeddings
-    data = np.load(embeddings_path)
-    X, y = data['embeddings'], data['labels']
+    from src.utils.database import FaceDatabase
+    
+    db = FaceDatabase()
+    X, y = db.load_all_embeddings()
+    
+    if len(X) > 0:
+        X = np.asarray(X)
+        y = np.asarray(y)
+        print(f"Loaded {len(X)} embeddings directly from the SQLite database.")
+    else:
+        print("Database is empty. Attempting to load from compressed npz backup...")
+        if not os.path.exists(embeddings_path):
+            print(f"Error: Embeddings file not found at {embeddings_path}")
+            return
+        # Load the compressed embeddings
+        data = np.load(embeddings_path)
+        X, y = data['embeddings'], data['labels']
     
     print(f"Dataset Loaded: {X.shape[0]} samples with {len(np.unique(y))} unique identities.")
 

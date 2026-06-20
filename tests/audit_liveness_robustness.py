@@ -32,19 +32,25 @@ def audit_liveness():
         rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         
         faces = detector.detect_faces(rgb_small)
-        for i, face_data in enumerate(faces):
-            x, y, fw, fh = [int(v / scale) for v in face_data['box']]
-            x, y = max(0, x), max(0, y)
-            crop = img[y:y+fh, x:x+fw]
-            if crop.size == 0:
-                continue
-
-            crop_resized = cv2.resize(crop, (160, 160), interpolation=cv2.INTER_LINEAR)
-            crop_rgb = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
+        # Sort faces by bounding box area to find the largest face
+        faces = sorted(faces, key=lambda f: f['box'][2] * f['box'][3], reverse=True)
+        if not faces:
+            continue
             
-            is_live, score = detect_liveness(crop_rgb, threshold=35.0)
-            if not is_live:
-                print(f"SUSPECTED SPOOF: {filename} (Face index {i}, Score: {score:.2f}, Image resolution: {w}x{h})")
+        # Only audit the largest face
+        face_data = faces[0]
+        x, y, fw, fh = [int(v / scale) for v in face_data['box']]
+        x, y = max(0, x), max(0, y)
+        crop = img[y:y+fh, x:x+fw]
+        if crop.size == 0:
+            continue
+
+        crop_resized = cv2.resize(crop, (160, 160), interpolation=cv2.INTER_LINEAR)
+        crop_rgb = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
+        
+        is_live, score = detect_liveness(crop_rgb, threshold=35.0)
+        if not is_live:
+            print(f"SUSPECTED SPOOF: {filename} (Score: {score:.2f}, Image resolution: {w}x{h})")
 
 if __name__ == "__main__":
     audit_liveness()

@@ -1,23 +1,42 @@
-import numpy as np
+import sys
 import os
+import numpy as np
 import joblib
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import classification_report, confusion_matrix, precision_recall_curve
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import LabelEncoder
 
+# Add project root to sys.path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
+
 def evaluate_system(embeddings_path, model_path, encoder_path):
     """
     Performs rigorous statistical evaluation of the classifier.
     """
-    if not os.path.exists(embeddings_path) or not os.path.exists(model_path):
-        print("Error: Missing data or model files for evaluation.")
-        return
-
-    # Load data
-    data = np.load(embeddings_path)
-    X, y = data['embeddings'], data['labels']
+    from src.utils.database import FaceDatabase
     
+    db = FaceDatabase()
+    X, y = db.load_all_embeddings()
+    
+    if len(X) > 0:
+        X = np.asarray(X)
+        y = np.asarray(y)
+        print(f"Loaded {len(X)} embeddings directly from the SQLite database for evaluation.")
+    else:
+        print("Database is empty. Attempting to load from compressed npz backup...")
+        if not os.path.exists(embeddings_path):
+            print("Error: Missing data or model files for evaluation.")
+            return
+        # Load data
+        data = np.load(embeddings_path)
+        X, y = data['embeddings'], data['labels']
+        
+    if not os.path.exists(model_path) or not os.path.exists(encoder_path):
+        print("Error: Missing classifier or encoder models for evaluation.")
+        return
+        
     # Load model and encoder
     model = joblib.load(model_path)
     encoder = joblib.load(encoder_path)

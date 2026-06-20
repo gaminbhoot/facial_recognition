@@ -83,6 +83,26 @@ class RecognitionEngine:
         self.privacy_mode = False
         self.frame_count = 0
         self.last_results = []
+        
+        # Load the SVM classifier model
+        self.load_svm_model()
+
+    def load_svm_model(self):
+        model_path = os.path.join(PROJECT_ROOT, 'models', 'face_classifier.pkl')
+        encoder_path = os.path.join(PROJECT_ROOT, 'models', 'label_encoder.pkl')
+        if os.path.exists(model_path) and os.path.exists(encoder_path):
+            try:
+                self.svm_model = joblib.load(model_path)
+                self.svm_encoder = joblib.load(encoder_path)
+                print("Loaded SVM face classifier and label encoder successfully.")
+            except Exception as e:
+                print(f"Error loading SVM model: {e}")
+                self.svm_model = None
+                self.svm_encoder = None
+        else:
+            self.svm_model = None
+            self.svm_encoder = None
+            print("Warning: SVM classifier files not found. Falling back to Cosine Similarity.")
 
     def process_frame(self, frame):
         self.perf.start('total_frame')
@@ -124,7 +144,10 @@ class RecognitionEngine:
                 self.perf.start('classification')
                 for i, embedding in enumerate(embeddings):
                     crop_rgb, x, y, fw, fh = valid_faces_metadata[i]
-                    _, raw_liveness_score = detect_liveness(crop_rgb, threshold=self.liveness_threshold)
+                    # Compute liveness on the raw/original resolution crop (BGR to RGB)
+                    raw_face_pixels = frame[y:y+fh, x:x+fw]
+                    raw_face_rgb = cv2.cvtColor(raw_face_pixels, cv2.COLOR_BGR2RGB)
+                    _, raw_liveness_score = detect_liveness(raw_face_rgb, threshold=self.liveness_threshold)
                     
                     # Smooth liveness score across consecutive frames
                     is_live, smoothed_liveness_score = self.liveness_tracker.get_smoothed_liveness(
@@ -132,7 +155,23 @@ class RecognitionEngine:
                     )
                     
                     if is_live:
-                        name, confidence = self.db.match_face(embedding, threshold=self.threshold)
+                        # Use SVM model if available, fallback to Cosine matching
+                        if self.svm_model is not None and self.svm_encoder is not None:
+                            try:
+                                probs = self.svm_model.predict_proba([embedding])
+                                max_idx = np.argmax(probs[0])
+                                svm_conf = float(probs[0][max_idx])
+                                if svm_conf >= self.threshold:
+                                    name = self.svm_encoder.inverse_transform([max_idx])[0]
+                                    confidence = svm_conf
+                                else:
+                                    name = "Unknown"
+                                    confidence = svm_conf
+                            except Exception as e:
+                                print(f"SVM prediction error, falling back: {e}")
+                                name, confidence = self.db.match_face(embedding, threshold=self.threshold)
+                        else:
+                            name, confidence = self.db.match_face(embedding, threshold=self.threshold)
                     else:
                         name = "Spoof Attack"
                         confidence = smoothed_liveness_score
@@ -308,15 +347,16 @@ def register_user(req: RegisterRequest):
     if face_pixels.size == 0:
         return {"status": "error", "message": "Invalid face crop size."}
         
-    # Run liveness check
-    crop_resized = cv2.resize(face_pixels, (160, 160), interpolation=cv2.INTER_LINEAR)
-    crop_rgb = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
-    is_live, liveness_score = detect_liveness(crop_rgb, threshold=engine.liveness_threshold)
+    # Run liveness check on original resolution crop
+    face_pixels_rgb = cv2.cvtColor(face_pixels, cv2.COLOR_BGR2RGB)
+    is_live, liveness_score = detect_liveness(face_pixels_rgb, threshold=engine.liveness_threshold)
     
     if not is_live:
         return {"status": "error", "message": f"Biometric verification failed (suspected spoof attack, score: {liveness_score:.1f})."}
         
     # Extract embedding
+    crop_resized = cv2.resize(face_pixels, (160, 160), interpolation=cv2.INTER_LINEAR)
+    crop_rgb = cv2.cvtColor(crop_resized, cv2.COLOR_BGR2RGB)
     embedding = engine.extractor.get_embedding(crop_rgb)
     if embedding is None:
         return {"status": "error", "message": "Failed to extract face embedding."}
@@ -324,6 +364,20 @@ def register_user(req: RegisterRequest):
     # Insert user and embedding into database
     user_id = engine.db.add_user(name)
     engine.db.add_embedding(user_id, "webcam_capture.jpg", embedding)
+    
+    # Retrain classifier in background thread so the SVM stays up to date
+    def retrain():
+        try:
+            from src.models.train_classifier import train_classifier
+            embeddings_path = os.path.join(PROJECT_ROOT, 'data', 'embeddings', 'face_embeddings.npz')
+            model_path = os.path.join(PROJECT_ROOT, 'models', 'face_classifier.pkl')
+            encoder_path = os.path.join(PROJECT_ROOT, 'models', 'label_encoder.pkl')
+            train_classifier(embeddings_path, model_path, encoder_path)
+            engine.load_svm_model()
+        except Exception as e:
+            print(f"Error in background retraining: {e}")
+            
+    threading.Thread(target=retrain, daemon=True).start()
     
     return {"status": "success", "message": f"Successfully enrolled '{name}' in database!"}
 
@@ -356,6 +410,21 @@ def delete_user(req: DeleteUserRequest):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE name = ?", (name,))
         conn.commit()
+        
+    # Retrain classifier in background thread so the SVM stays up to date
+    def retrain():
+        try:
+            from src.models.train_classifier import train_classifier
+            embeddings_path = os.path.join(PROJECT_ROOT, 'data', 'embeddings', 'face_embeddings.npz')
+            model_path = os.path.join(PROJECT_ROOT, 'models', 'face_classifier.pkl')
+            encoder_path = os.path.join(PROJECT_ROOT, 'models', 'label_encoder.pkl')
+            train_classifier(embeddings_path, model_path, encoder_path)
+            engine.load_svm_model()
+        except Exception as e:
+            print(f"Error in background retraining: {e}")
+            
+    threading.Thread(target=retrain, daemon=True).start()
+    
     return {"status": "success", "message": f"Successfully deleted user '{name}'."}
 
 @app.get('/settings')
