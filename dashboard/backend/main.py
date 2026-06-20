@@ -109,11 +109,11 @@ class RecognitionEngine:
         
         if self.frame_count % self.frame_skip == 0:
             h, w, _ = frame.shape
-            # Dynamic scale factor targeting ~320px width
-            self.scale_factor = max(0.15, min(0.5, 320.0 / w))
+            # Dynamic scale factor targeting ~640px width to improve detection accuracy
+            self.scale_factor = max(0.25, min(1.0, 640.0 / w))
             
             self.perf.start('detection')
-            small_frame = cv2.resize(frame, (0,0), fx=self.scale_factor, fy=self.scale_factor, interpolation=cv2.INTER_NEAREST)
+            small_frame = cv2.resize(frame, (0,0), fx=self.scale_factor, fy=self.scale_factor, interpolation=cv2.INTER_AREA)
             rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
             faces = self.detector.detect_faces(rgb_small)
             self.perf.stop('detection')
@@ -150,7 +150,7 @@ class RecognitionEngine:
                     _, raw_liveness_score = detect_liveness(raw_face_rgb, threshold=self.liveness_threshold)
                     
                     # Smooth liveness score across consecutive frames
-                    is_live, smoothed_liveness_score = self.liveness_tracker.get_smoothed_liveness(
+                    is_live, smoothed_liveness_score, is_spoof_confirmed = self.liveness_tracker.get_smoothed_liveness(
                         (x, y, fw, fh), raw_liveness_score, threshold=self.liveness_threshold
                     )
                     
@@ -172,8 +172,11 @@ class RecognitionEngine:
                                 name, confidence = self.db.match_face(embedding, threshold=self.threshold)
                         else:
                             name, confidence = self.db.match_face(embedding, threshold=self.threshold)
-                    else:
+                    elif is_spoof_confirmed:
                         name = "Spoof Attack"
+                        confidence = smoothed_liveness_score
+                    else:
+                        name = "Unknown"
                         confidence = smoothed_liveness_score
                     
                     current_results.append({'box': (x, y, fw, fh), 'name': name, 'conf': float(confidence)})
@@ -329,8 +332,8 @@ def register_user(req: RegisterRequest):
 
     # Perform detection
     h, w, _ = frame.shape
-    scale_factor = max(0.15, min(0.5, 320.0 / w))
-    small_frame = cv2.resize(frame, (0,0), fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_NEAREST)
+    scale_factor = max(0.25, min(1.0, 640.0 / w))
+    small_frame = cv2.resize(frame, (0,0), fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_AREA)
     rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
     faces = engine.detector.detect_faces(rgb_small)
     
